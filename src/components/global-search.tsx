@@ -2,8 +2,20 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { Calculator, CreditCard, Package, Search, Settings, Truck } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import {
+  BarChart2,
+  Box,
+  CreditCard,
+  LayoutDashboard,
+  Package,
+  Search,
+  Settings,
+  Truck,
+  X,
+  Clock,
+  ArrowRight,
+  Zap,
+} from "lucide-react"
 import {
   CommandDialog,
   CommandEmpty,
@@ -15,7 +27,6 @@ import {
 } from "@/components/ui/command"
 import { Skeleton } from "@/components/ui/skeleton"
 
-// Mock data for demonstration - replace with your actual data sources
 const recentSearches = [
   { id: "ORD-5498", type: "order", title: "Customer 123 Order" },
   { id: "SHP-ID-9876", type: "shipment", title: "Carrier 1 Shipment" },
@@ -23,12 +34,12 @@ const recentSearches = [
 ]
 
 const quickLinks = [
-  { id: "dashboard", title: "Dashboard", icon: Calculator },
+  { id: "dashboard", title: "Dashboard", icon: LayoutDashboard },
   { id: "control-tower", title: "Control Tower", icon: Settings },
   { id: "order-management", title: "Order Management", icon: Package },
   { id: "track-trace", title: "Track & Trace", icon: Truck },
-  { id: "order-fulfillment", title: "Order Fulfillment", icon: Package },
-  { id: "service-analytics", title: "Service Level Analytics", icon: CreditCard },
+  { id: "order-fulfillment", title: "Order Fulfillment", icon: Box },
+  { id: "service-analytics", title: "Service Level Analytics", icon: BarChart2 },
 ]
 
 type SearchResult = {
@@ -39,6 +50,13 @@ type SearchResult = {
   route?: string
 }
 
+const typeConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
+  order: { label: "Order", color: "bg-blue-100 text-blue-700", icon: Package },
+  shipment: { label: "Shipment", color: "bg-amber-100 text-amber-700", icon: Truck },
+  customer: { label: "Customer", color: "bg-emerald-100 text-emerald-700", icon: CreditCard },
+  page: { label: "Page", color: "bg-purple-100 text-purple-700", icon: LayoutDashboard },
+}
+
 export function GlobalSearch() {
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
@@ -46,7 +64,6 @@ export function GlobalSearch() {
   const [isLoading, setIsLoading] = React.useState(false)
   const [results, setResults] = React.useState<SearchResult[]>([])
 
-  // Toggle the menu when ⌘K is pressed
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
@@ -54,7 +71,6 @@ export function GlobalSearch() {
         setOpen((open) => !open)
       }
     }
-
     document.addEventListener("keydown", down)
     return () => document.removeEventListener("keydown", down)
   }, [])
@@ -64,15 +80,9 @@ export function GlobalSearch() {
       setResults([])
       return
     }
-
     setIsLoading(true)
-
-    // Simulate API call with setTimeout
     setTimeout(() => {
-      // Mock search results - replace with actual search logic
       const searchResults: SearchResult[] = []
-
-      // Search for orders
       if (searchQuery.toUpperCase().startsWith("ORD")) {
         searchResults.push({
           id: searchQuery.toUpperCase(),
@@ -82,8 +92,6 @@ export function GlobalSearch() {
           route: `/orders/${searchQuery.toUpperCase()}`,
         })
       }
-
-      // Search for shipments
       if (searchQuery.toUpperCase().startsWith("SHP")) {
         searchResults.push({
           id: searchQuery.toUpperCase(),
@@ -93,10 +101,9 @@ export function GlobalSearch() {
           route: `/shipments/${searchQuery.toUpperCase()}`,
         })
       }
-
-      // Search for pages
-      const pageMatches = quickLinks.filter((link) => link.title.toLowerCase().includes(searchQuery.toLowerCase()))
-
+      const pageMatches = quickLinks.filter((link) =>
+        link.title.toLowerCase().includes(searchQuery.toLowerCase())
+      )
       pageMatches.forEach((match) => {
         searchResults.push({
           id: match.id,
@@ -106,10 +113,9 @@ export function GlobalSearch() {
           route: `/${match.id.toLowerCase().replace(/\s+/g, "-")}`,
         })
       })
-
       setResults(searchResults)
       setIsLoading(false)
-    }, 500)
+    }, 400)
   }, [])
 
   React.useEffect(() => {
@@ -118,104 +124,190 @@ export function GlobalSearch() {
 
   const handleSelect = (result: SearchResult) => {
     setOpen(false)
-
-    if (result.route) {
-      router.push(result.route)
-    }
+    if (result.route) router.push(result.route)
   }
 
   return (
     <>
-      <Button
-        variant="outline"
-        className="relative h-12 lg:w-[600px] w-[200px] justify-start items-center rounded-[0.5rem] bg-neutral-200 text-base font-normal text-muted-foreground shadow-none"
+      {/* Search trigger button */}
+      <button
         onClick={() => setOpen(true)}
+        className="group flex items-center gap-2.5 h-9 lg:w-[420px] w-[160px] px-3 rounded-lg border border-white/20 bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all duration-200 text-sm text-white/60 hover:text-white/80"
       >
-        <span className="flex items-center">
-          <Search className="mr-2 h-6 w-6" />
-          Search anything...
-        </span>
-        <kbd className="pointer-events-none absolute mt-1 right-1.5 top-1.5 hidden h-6 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
-          <span className="text-xs">⌘</span>K
+        <Search className="h-4 w-4 shrink-0 text-white/50 group-hover:text-white/70 transition-colors" />
+        <span className="flex-1 text-left truncate text-white/50 group-hover:text-white/70 transition-colors">Search anything...</span>
+        <kbd className="hidden sm:flex items-center gap-0.5 rounded border border-white/20 bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-white/40">
+          <span>⌘</span>K
         </kbd>
-      </Button>
+      </button>
+
+      {/* Command dialog */}
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Search orders, shipments, customers..." value={query} onValueChange={setQuery} />
-        <CommandList>
-          <CommandEmpty>No results found.</CommandEmpty>
+        <div className="flex items-center gap-2 border-b border-neutral-100 px-4 py-1">
+          <CommandInput
+            placeholder="Search orders, shipments, pages..."
+            value={query}
+            onValueChange={setQuery}
+            className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-neutral-400 focus:ring-0 h-11"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery("")}
+              className="shrink-0 rounded-md p-1 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        <CommandList className="max-h-[420px] overflow-y-auto p-2">
           {isLoading ? (
-            <div className="p-4">
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-4/5" />
-                <Skeleton className="h-4 w-3/5" />
-                <Skeleton className="h-4 w-2/3" />
-              </div>
+            <div className="p-3 space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <Skeleton className="h-8 w-8 rounded-lg" />
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-3 w-2/5" />
+                    <Skeleton className="h-2.5 w-3/5" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <>
+              {query.length > 0 && results.length === 0 && (
+                <CommandEmpty>
+                  <div className="flex flex-col items-center gap-2 py-8 text-neutral-400">
+                    <Search className="h-8 w-8 opacity-40" />
+                    <p className="text-sm">No results for &ldquo;{query}&rdquo;</p>
+                    <p className="text-xs text-neutral-300">Try searching for orders (ORD-), shipments (SHP-), or pages</p>
+                  </div>
+                </CommandEmpty>
+              )}
+
               {query.length > 0 && results.length > 0 && (
-                <CommandGroup heading="Search Results">
-                  {results.map((result) => (
-                    <CommandItem key={result.id} value={result.id} onSelect={() => handleSelect(result)}>
-                      {result.type === "order" && <Package className="mr-2 h-4 w-4" />}
-                      {result.type === "shipment" && <Truck className="mr-2 h-4 w-4" />}
-                      {result.type === "page" && <Calculator className="mr-2 h-4 w-4" />}
-                      <span>{result.title}</span>
-                    </CommandItem>
-                  ))}
+                <CommandGroup heading={
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-neutral-500 uppercase tracking-wider px-1 pb-1">
+                    <Zap className="h-3 w-3" /> Results
+                  </span>
+                }>
+                  {results.map((result) => {
+                    const config = typeConfig[result.type] ?? typeConfig.page
+                    const Icon = config.icon
+                    return (
+                      <CommandItem
+                        key={result.id}
+                        value={result.id}
+                        onSelect={() => handleSelect(result)}
+                        className="group flex items-center gap-3 rounded-lg px-3 py-2.5 cursor-pointer hover:bg-neutral-50 aria-selected:bg-blue-50"
+                      >
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 group-aria-selected:bg-white">
+                          <Icon className="h-4 w-4 text-neutral-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-neutral-800 truncate">{result.title}</p>
+                          {result.description && (
+                            <p className="text-xs text-neutral-400 truncate">{result.description}</p>
+                          )}
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${config.color}`}>
+                          {config.label}
+                        </span>
+                        <ArrowRight className="h-3.5 w-3.5 text-neutral-300 opacity-0 group-aria-selected:opacity-100 transition-opacity" />
+                      </CommandItem>
+                    )
+                  })}
                 </CommandGroup>
               )}
 
               {query.length === 0 && (
                 <>
-                  <CommandGroup heading="Recent Searches">
-                    {recentSearches.map((item) => (
-                      <CommandItem
-                        key={item.id}
-                        value={item.id}
-                        onSelect={() => {
-                          setOpen(false)
-                          // Navigate to the appropriate route based on the type
-                          const route =
-                            item.type === "order"
-                              ? `/orders/${item.id}`
-                              : item.type === "shipment"
-                                ? `/shipments/${item.id}`
-                                : `/customers/${item.id}`
-                          router.push(route)
-                        }}
-                      >
-                        {item.type === "order" && <Package className="mr-2 h-4 w-4" />}
-                        {item.type === "shipment" && <Truck className="mr-2 h-4 w-4" />}
-                        {item.type === "customer" && <CreditCard className="mr-2 h-4 w-4" />}
-                        <span>{item.title}</span>
-                        <span className="ml-2 text-xs text-muted-foreground">({item.id})</span>
-                      </CommandItem>
-                    ))}
+                  <CommandGroup heading={
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-neutral-500 uppercase tracking-wider px-1 pb-1">
+                      <Clock className="h-3 w-3" /> Recent
+                    </span>
+                  }>
+                    {recentSearches.map((item) => {
+                      const config = typeConfig[item.type] ?? typeConfig.page
+                      const Icon = config.icon
+                      return (
+                        <CommandItem
+                          key={item.id}
+                          value={item.id}
+                          onSelect={() => {
+                            setOpen(false)
+                            const route =
+                              item.type === "order"
+                                ? `/orders/${item.id}`
+                                : item.type === "shipment"
+                                  ? `/shipments/${item.id}`
+                                  : `/customers/${item.id}`
+                            router.push(route)
+                          }}
+                          className="group flex items-center gap-3 rounded-lg px-3 py-2.5 cursor-pointer hover:bg-neutral-50 aria-selected:bg-blue-50"
+                        >
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 group-aria-selected:bg-white">
+                            <Icon className="h-4 w-4 text-neutral-500" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-neutral-800 truncate">{item.title}</p>
+                            <p className="text-xs text-neutral-400 truncate">{item.id}</p>
+                          </div>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${config.color}`}>
+                            {config.label}
+                          </span>
+                        </CommandItem>
+                      )
+                    })}
                   </CommandGroup>
-                  <CommandSeparator />
-                  <CommandGroup heading="Quick Links">
-                    {quickLinks.map((link) => (
-                      <CommandItem
-                        key={link.id}
-                        value={link.id}
-                        onSelect={() => {
-                          setOpen(false)
-                          router.push(`/${link.id.toLowerCase().replace(/\s+/g, "-")}`)
-                        }}
-                      >
-                        <link.icon className="mr-2 h-4 w-4" />
-                        <span>{link.title}</span>
-                      </CommandItem>
-                    ))}
+
+                  <CommandSeparator className="my-2" />
+
+                  <CommandGroup heading={
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-neutral-500 uppercase tracking-wider px-1 pb-1">
+                      <Zap className="h-3 w-3" /> Quick Links
+                    </span>
+                  }>
+                    <div className="grid grid-cols-2 gap-1 px-1 pb-1">
+                      {quickLinks.map((link) => (
+                        <CommandItem
+                          key={link.id}
+                          value={link.id}
+                          onSelect={() => {
+                            setOpen(false)
+                            router.push(`/${link.id.toLowerCase().replace(/\s+/g, "-")}`)
+                          }}
+                          className="group flex items-center gap-2.5 rounded-lg px-3 py-2 cursor-pointer hover:bg-neutral-50 aria-selected:bg-blue-50"
+                        >
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-neutral-100 group-aria-selected:bg-white">
+                            <link.icon className="h-3.5 w-3.5 text-neutral-500" />
+                          </div>
+                          <span className="text-xs font-medium text-neutral-700 truncate">{link.title}</span>
+                        </CommandItem>
+                      ))}
+                    </div>
                   </CommandGroup>
                 </>
               )}
             </>
           )}
         </CommandList>
+
+        {/* Footer hint */}
+        <div className="flex items-center border-t border-neutral-100 px-4 py-2.5">
+          <div className="flex items-center gap-3 text-[11px] text-neutral-400">
+            <span className="flex items-center gap-1">
+              <kbd className="rounded border border-neutral-200 bg-neutral-100 px-1 font-mono">↑↓</kbd> navigate
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="rounded border border-neutral-200 bg-neutral-100 px-1 font-mono">↵</kbd> select
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="rounded border border-neutral-200 bg-neutral-100 px-1 font-mono">esc</kbd> close
+            </span>
+          </div>
+        </div>
       </CommandDialog>
     </>
   )
 }
-

@@ -36,3 +36,10 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# data files
+/datasets/
+/dunnhumby_The-Complete-Journey/
+/notebooks/
+winter-udp.zip
+.claude/

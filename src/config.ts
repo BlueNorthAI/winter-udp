@@ -1,6 +1,5 @@
-export const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
-export const WORKSPACES_ID = process.env.NEXT_PUBLIC_APPWRITE_WORKSPACES_ID!;
-export const MEMBERS_ID = process.env.NEXT_PUBLIC_APPWRITE_MEMBERS_ID!;
-export const PROJECTS_ID = process.env.NEXT_PUBLIC_APPWRITE_PROJECTS_ID!;
-export const TASKS_ID = process.env.NEXT_PUBLIC_APPWRITE_TASKS_ID!;
-export const IMAGES_BUCKET_ID = process.env.NEXT_PUBLIC_APPWRITE_IMAGES_BUCKET_ID!;
+// PostgreSQL Datalake Configuration
+export const PG_DATABASE_URL = process.env.DATABASE_URL!;
+export const PG_MAX_CONNECTIONS = parseInt(process.env.PG_MAX_CONNECTIONS || "10", 10);
+export const PG_STATEMENT_TIMEOUT_MS = parseInt(process.env.PG_STATEMENT_TIMEOUT_MS || "30000", 10);
+export const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "";

@@ -13,8 +13,8 @@ import { TaskStatus } from "../types";
 
 interface EventCardProps {
   title: string;
-  assignee: Member;
-  project: Project;
+  assignee?: Member | { $id: string; name: string; email: string } | null;
+  project?: Project | { $id: string; name: string; imageUrl: string } | null;
   status: TaskStatus;
   id: string;
 };
@@ -54,12 +54,12 @@ export const EventCard = ({
         <p>{title}</p>
         <div className="flex items-center gap-x-1">
           <MemberAvatar
-            name={assignee?.name}
+            name={assignee?.name || ""}
           />
           <div className="size-1 rounded-full bg-neutral-300" />
           <ProjectAvatar
-            name={project?.name}
-            image={project?.imageUrl}
+            name={project?.name || ""}
+            image={project?.imageUrl ?? null}
           />
         </div>
       </div>

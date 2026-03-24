@@ -112,8 +112,8 @@ export const DataCalendar = ({
           <EventCard
             id={event.id}
             title={event.title}
-            assignee={event.assignee}
-            project={event.project}
+            assignee={event.assignee || undefined}
+            project={event.project || undefined}
             status={event.status}
           />
         ),

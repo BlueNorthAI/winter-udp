@@ -1,160 +1,132 @@
 import { z } from "zod";
 import { Hono } from "hono";
-import { Query } from "node-appwrite";
 import { zValidator } from "@hono/zod-validator";
+import { Pool } from "pg";
 
-import { createAdminClient } from "@/lib/appwrite";
-import { DATABASE_ID, MEMBERS_ID } from "@/config";
 import { sessionMiddleware } from "@/lib/session-middleware";
-
 import { getMember } from "../utils";
-import { Member, MemberRole } from "../types";
+import { MemberRole } from "../types";
 
 const app = new Hono()
-  .get(
-    "/",
-    sessionMiddleware,
-    zValidator("query", z.object({ workspaceId: z.string() })),
-    async (c) => {
-      const { users } = await createAdminClient();
-      const databases = c.get("databases");
-      const user = c.get("user");
-      const { workspaceId } = c.req.valid("query");
+  .get("/", sessionMiddleware, async (c) => {
+    const user = c.get("user");
+    const db = c.get("db") as Pool;
+    const { workspaceId } = c.req.query();
 
-      const member = await getMember({
-        databases,
-        workspaceId,
-        userId: user.$id,
-      });
-
-      if (!member) {
-        return c.json({ error: "Unauthorized" }, 401);
-      }
-
-      const members = await databases.listDocuments<Member>(
-        DATABASE_ID,
-        MEMBERS_ID,
-        [Query.equal("workspaceId", workspaceId)]
-      );
-
-      const populatedMembers = await Promise.all(
-        members.documents.map(async (member) => {
-          const user = await users.get(member.userId);
-
-          return {
-            ...member,
-            name: user.name || user.email,
-            email: user.email,
-          }
-        })
-      );
-
-      return c.json({
-        data: {
-          ...members,
-          documents: populatedMembers,
-        },
-      });
+    if (!workspaceId) {
+      return c.json({ error: "workspaceId is required" }, 400);
     }
-  )
-  .delete(
-    "/:memberId",
-    sessionMiddleware,
-    async (c) => {
-      const { memberId } = c.req.param();
-      const user = c.get("user");
-      const databases = c.get("databases");
 
-      const memberToDelete = await databases.getDocument(
-        DATABASE_ID,
-        MEMBERS_ID,
-        memberId,
-      );
-
-      const allMembersInWorkspace = await databases.listDocuments(
-        DATABASE_ID,
-        MEMBERS_ID,
-        [Query.equal("workspaceId", memberToDelete.workspaceId)]
-      );
-
-      const member = await getMember({
-        databases,
-        workspaceId: memberToDelete.workspaceId,
-        userId: user.$id
-      });
-
-      if (!member) {
-        return c.json({ error: "Unauthorized" }, 401);
-      }
-      
-      if (member.$id !== memberToDelete.$id && member.role !== MemberRole.ADMIN) {
-        return c.json({ error: "Unauthorized" }, 401);
-      }
-      
-      if (allMembersInWorkspace.total === 1) {
-        return c.json({ error: "Cannot delete the only member" }, 400);
-      }
-
-      await databases.deleteDocument(
-        DATABASE_ID,
-        MEMBERS_ID,
-        memberId,
-      );
-
-      return c.json({ data: { $id: memberToDelete.$id } });
+    const member = await getMember({ db, workspaceId, userId: user.id });
+    if (!member) {
+      return c.json({ error: "Unauthorized" }, 401);
     }
-  )
+
+    const result = await db.query(
+      `SELECT m.id as "$id", m.workspace_id as "workspaceId", m.user_id as "userId", m.role,
+              u.name, u.email
+       FROM app.members m
+       JOIN app.users u ON m.user_id = u.id
+       WHERE m.workspace_id = $1
+       ORDER BY m.created_at`,
+      [workspaceId]
+    );
+
+    return c.json({
+      data: {
+        documents: result.rows,
+        total: result.rows.length,
+      },
+    });
+  })
+  .delete("/:memberId", sessionMiddleware, async (c) => {
+    const user = c.get("user");
+    const db = c.get("db") as Pool;
+    const { memberId } = c.req.param();
+
+    // Get the member being deleted
+    const memberResult = await db.query(
+      "SELECT id, workspace_id, user_id FROM app.members WHERE id = $1",
+      [memberId]
+    );
+
+    if (memberResult.rows.length === 0) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const memberToDelete = memberResult.rows[0];
+
+    // Check if current user is admin
+    const currentMember = await getMember({
+      db,
+      workspaceId: memberToDelete.workspace_id,
+      userId: user.id,
+    });
+
+    if (!currentMember || currentMember.role !== MemberRole.ADMIN) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    // Count admins - don't delete last admin
+    const adminCount = await db.query(
+      "SELECT count(*) FROM app.members WHERE workspace_id = $1 AND role = 'ADMIN'",
+      [memberToDelete.workspace_id]
+    );
+
+    if (parseInt(adminCount.rows[0].count) <= 1 && memberToDelete.user_id === user.id) {
+      return c.json({ error: "Cannot remove the last admin" }, 400);
+    }
+
+    await db.query("DELETE FROM app.members WHERE id = $1", [memberId]);
+
+    return c.json({ data: { $id: memberId } });
+  })
   .patch(
     "/:memberId",
     sessionMiddleware,
     zValidator("json", z.object({ role: z.nativeEnum(MemberRole) })),
     async (c) => {
+      const user = c.get("user");
+      const db = c.get("db") as Pool;
       const { memberId } = c.req.param();
       const { role } = c.req.valid("json");
-      const user = c.get("user");
-      const databases = c.get("databases");
 
-      const memberToUpdate = await databases.getDocument(
-        DATABASE_ID,
-        MEMBERS_ID,
-        memberId,
+      const memberResult = await db.query(
+        "SELECT id, workspace_id, user_id, role FROM app.members WHERE id = $1",
+        [memberId]
       );
 
-      const allMembersInWorkspace = await databases.listDocuments(
-        DATABASE_ID,
-        MEMBERS_ID,
-        [Query.equal("workspaceId", memberToUpdate.workspaceId)]
-      );
+      if (memberResult.rows.length === 0) {
+        return c.json({ error: "Not found" }, 404);
+      }
 
-      const member = await getMember({
-        databases,
-        workspaceId: memberToUpdate.workspaceId,
-        userId: user.$id
+      const memberToUpdate = memberResult.rows[0];
+
+      const currentMember = await getMember({
+        db,
+        workspaceId: memberToUpdate.workspace_id,
+        userId: user.id,
       });
 
-      if (!member) {
+      if (!currentMember || currentMember.role !== MemberRole.ADMIN) {
         return c.json({ error: "Unauthorized" }, 401);
-      }
-      
-      if (member.role !== MemberRole.ADMIN) {
-        return c.json({ error: "Unauthorized" }, 401);
-      }
-      
-      if (allMembersInWorkspace.total === 1) {
-        return c.json({ error: "Cannot downgrade the only member" }, 400);
       }
 
-      await databases.updateDocument(
-        DATABASE_ID,
-        MEMBERS_ID,
-        memberId,
-        {
-          role,
+      // Don't downgrade the last admin
+      if (memberToUpdate.role === "ADMIN" && role === MemberRole.MEMBER) {
+        const adminCount = await db.query(
+          "SELECT count(*) FROM app.members WHERE workspace_id = $1 AND role = 'ADMIN'",
+          [memberToUpdate.workspace_id]
+        );
+        if (parseInt(adminCount.rows[0].count) <= 1) {
+          return c.json({ error: "Cannot downgrade the last admin" }, 400);
         }
-      );
+      }
 
-      return c.json({ data: { $id: memberToUpdate.$id } });
+      await db.query("UPDATE app.members SET role = $1 WHERE id = $2", [role, memberId]);
+
+      return c.json({ data: { $id: memberId, role } });
     }
-  )
+  );
 
 export default app;

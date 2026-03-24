@@ -1,71 +1,121 @@
 "use client"
 
 import { useState } from "react"
-import { Play, ChevronDown, Star, Plus, X, RefreshCw, MoreHorizontal } from "lucide-react"
+import { Play, ChevronDown, Star, Plus, X, RefreshCw, Save, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useWorkspaceId } from "@/features/workspaces/hooks/use-workspace-id"
+import { useExecuteQuery } from "@/features/sql/api/use-execute-query"
+import { useSaveQuery } from "@/features/sql/api/use-save-query"
+import { useGetSchemas } from "@/features/catalog/api/use-get-schemas"
 import { CatalogBrowser } from "./catalog-browser"
 import { QueryEditor } from "./query-editor"
 import { ResultsPanel } from "./results-panel"
 
+interface QueryTab {
+  id: string
+  name: string
+  sql: string
+}
+
 export function SqlEditor() {
-  const [activeTab, setActiveTab] = useState("01-Deltalakehouse-pre-setup")
-  const [sqlQuery, setSqlQuery] = useState(`USE CATALOG pricing_analytics;
+  const workspaceId = useWorkspaceId()
+  const executeQuery = useExecuteQuery()
+  const saveQuery = useSaveQuery()
+  const { data: schemas } = useGetSchemas(workspaceId)
 
-CREATE SCHEMA IF NOT EXISTS processrunlogs;
+  const [tabs, setTabs] = useState<QueryTab[]>([
+    { id: "1", name: "Query 1", sql: "SELECT * FROM retail.products LIMIT 100;" },
+  ])
+  const [activeTabId, setActiveTabId] = useState("1")
+  const [results, setResults] = useState<{
+    columns: string[]
+    rows: Record<string, unknown>[]
+    rowCount: number
+    executionTimeMs: number
+    command: string
+  } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
+  const [saveName, setSaveName] = useState("")
 
-CREATE TABLE IF NOT EXISTS processrunlogs.DELTALAKEHOUSE_PROCESS_RUNS(
-  PROCESS_NAME STRING,
-  PROCESSED_FILE_TABLE_DATE DATE,
-  PROCESS_STATUS STRING
-)
+  const activeTab = tabs.find((t) => t.id === activeTabId)
+  const sqlQuery = activeTab?.sql || ""
 
-ALTER TABLE pricing_analytics.processrunlogs.deltalakehouse_process_runs
-ADD COLUMNS (PROCESSED_FILE_TABLE_DATETIME TIMESTAMP);`)
-
-  const [selectedDatabase] = useState("")
-  const [selectedWarehouse] = useState("")
-  const [warehouseSize] = useState("")
+  const setSqlQuery = (sql: string) => {
+    setTabs((prev) => prev.map((t) => t.id === activeTabId ? { ...t, sql } : t))
+  }
 
   const handleRunQuery = () => {
-    // In a real implementation, this would send the query to a backend
-    console.log("Running query:", sqlQuery)
+    setError(null)
+    setResults(null)
+
+    executeQuery.mutate(
+      { workspaceId, sql: sqlQuery },
+      {
+        onSuccess: (data) => {
+          setResults(data)
+          setError(null)
+        },
+        onError: (err) => {
+          setError(err.message)
+          setResults(null)
+        },
+      }
+    )
+  }
+
+  const handleSave = () => {
+    if (!saveName) return
+    saveQuery.mutate(
+      { workspaceId, name: saveName, sql: sqlQuery },
+      {
+        onSuccess: () => {
+          setShowSaveDialog(false)
+          setSaveName("")
+        },
+      }
+    )
+  }
+
+  const addTab = () => {
+    const newId = String(Date.now())
+    setTabs((prev) => [...prev, { id: newId, name: `Query ${prev.length + 1}`, sql: "" }])
+    setActiveTabId(newId)
+  }
+
+  const closeTab = (id: string) => {
+    if (tabs.length <= 1) return
+    const newTabs = tabs.filter((t) => t.id !== id)
+    setTabs(newTabs)
+    if (activeTabId === id) setActiveTabId(newTabs[0].id)
   }
 
   return (
     <div className="flex flex-col h-full">
       {/* Tabs */}
       <div className="flex border-b">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
-          <TabsList className="bg-transparent h-10 p-0">
-            <TabsTrigger
-              value="01-Deltalakehouse-pre-setup"
-              className="rounded-none border-r data-[state=active]:bg-white data-[state=active]:shadow-none px-4 h-10"
+        <div className="flex-1 flex overflow-auto">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTabId(tab.id)}
+              className={`flex items-center gap-2 px-4 h-10 border-r text-sm whitespace-nowrap ${
+                activeTabId === tab.id ? "bg-white font-medium" : "bg-muted/30 text-muted-foreground"
+              }`}
             >
-              01-Deltalakehouse-pre-setup
-            </TabsTrigger>
-            <TabsTrigger
-              value="02-Deltalakehouse-bronze-layer-tables-setup"
-              className="rounded-none border-r data-[state=active]:bg-white data-[state=active]:shadow-none px-4 h-10"
-            >
-              02-Deltalakehouse-bronze-layer-tables-setup
-            </TabsTrigger>
-            <TabsTrigger
-              value="03-Deltalakehouse-silver-layer-table"
-              className="rounded-none border-r data-[state=active]:bg-white data-[state=active]:shadow-none px-4 h-10"
-            >
-              03-Deltalakehouse-silver-layer-table
-            </TabsTrigger>
-            <TabsTrigger
-              value="04-Deltalakehouse-gold-layer-reporting-table"
-              className="rounded-none border-r data-[state=active]:bg-white data-[state=active]:shadow-none px-4 h-10"
-            >
-              04-Deltalakehouse-gold-layer-reporting-table
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none border-l">
+              {tab.name}
+              {tabs.length > 1 && (
+                <X
+                  className="h-3 w-3 hover:text-red-500"
+                  onClick={(e) => { e.stopPropagation(); closeTab(tab.id) }}
+                />
+              )}
+            </button>
+          ))}
+        </div>
+        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none border-l" onClick={addTab}>
           <Plus className="h-4 w-4" />
         </Button>
       </div>
@@ -75,26 +125,13 @@ ADD COLUMNS (PROCESSED_FILE_TABLE_DATETIME TIMESTAMP);`)
         {/* Left panel - Catalog browser */}
         <div className="w-64 border-r flex flex-col">
           <div className="flex items-center justify-between p-2 border-b">
-            <span className="font-medium">Catalog</span>
-            <div className="flex">
-              <Button variant="ghost" size="icon" className="h-6 w-6">
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-6 w-6">
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            <span className="font-medium text-sm">Catalog</span>
+            <Button variant="ghost" size="icon" className="h-6 w-6">
+              <RefreshCw className="h-3.5 w-3.5" />
+            </Button>
           </div>
           <div className="p-2">
-            <Input type="text" placeholder="Type to search..." className="h-8 text-sm" />
-          </div>
-          <div className="flex p-2 gap-2">
-            <Button variant="outline" size="sm" className="text-xs h-7">
-              For you
-            </Button>
-            <Button variant="outline" size="sm" className="text-xs h-7">
-              All
-            </Button>
+            <Input type="text" placeholder="Search..." className="h-7 text-xs" />
           </div>
           <CatalogBrowser />
         </div>
@@ -103,51 +140,56 @@ ADD COLUMNS (PROCESSED_FILE_TABLE_DATETIME TIMESTAMP);`)
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Query controls */}
           <div className="flex items-center p-2 border-b gap-2">
-            <Button className="bg-blue-600 hover:bg-blue-700 flex items-center gap-1">
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 flex items-center gap-1"
+              onClick={handleRunQuery}
+              disabled={executeQuery.isPending || !sqlQuery.trim()}
+            >
               <Play className="h-4 w-4" />
-              Run all (1000)
+              {executeQuery.isPending ? "Running..." : "Run"}
             </Button>
-            <Button variant="outline" size="icon" className="h-8 w-8">
-              <ChevronDown className="h-4 w-4" />
-            </Button>
-            <div className="flex items-center gap-1 border rounded-md px-2 py-1">
-              <div className="h-4 w-4 bg-gray-200 rounded-sm"></div>
-              <span className="text-sm">{selectedDatabase}</span>
-              <ChevronDown className="h-4 w-4" />
-            </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Star className="h-4 w-4" />
-            </Button>
+
             <div className="flex items-center ml-auto gap-2">
-              <div className="flex items-center gap-1">
-                <div className="h-4 w-4 bg-gray-200 rounded-sm"></div>
-                <span className="text-sm">{selectedWarehouse}</span>
-                <span className="text-sm text-muted-foreground">{warehouseSize}</span>
-                <ChevronDown className="h-4 w-4" />
-              </div>
-              <Button variant="outline" className="h-8">
-                Save
-              </Button>
-              <Button variant="outline" className="h-8">
-                Schedule
-              </Button>
-              <Button variant="outline" className="h-8">
-                Share
-              </Button>
+              {showSaveDialog ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={saveName}
+                    onChange={(e) => setSaveName(e.target.value)}
+                    placeholder="Query name..."
+                    className="h-8 w-48 text-sm"
+                    onKeyDown={(e) => e.key === "Enter" && handleSave()}
+                  />
+                  <Button variant="outline" className="h-8" onClick={handleSave} disabled={!saveName}>
+                    Save
+                  </Button>
+                  <Button variant="ghost" className="h-8" onClick={() => setShowSaveDialog(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="outline" className="h-8" onClick={() => setShowSaveDialog(true)}>
+                  <Save className="h-3.5 w-3.5 mr-1" /> Save
+                </Button>
+              )}
             </div>
           </div>
 
           {/* Query editor */}
-          <div className="flex-1 overflow-hidden">
-            <QueryEditor value={sqlQuery } onChange={setSqlQuery} onRun={handleRunQuery} />
+          <div className="flex-1 overflow-hidden min-h-[200px]">
+            <QueryEditor value={sqlQuery} onChange={setSqlQuery} onRun={handleRunQuery} />
           </div>
 
           {/* Results panel */}
-          <div className="h-64 border-t">
-            <ResultsPanel />
+          <div className="h-72 border-t">
+            <ResultsPanel
+              columns={results?.columns}
+              rows={results?.rows}
+              rowCount={results?.rowCount}
+              executionTimeMs={results?.executionTimeMs}
+              error={error}
+              isLoading={executeQuery.isPending}
+              command={results?.command}
+            />
           </div>
         </div>
       </div>

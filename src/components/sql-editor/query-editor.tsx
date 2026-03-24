@@ -1,7 +1,9 @@
 "use client"
 
+import dynamic from "next/dynamic"
+import { useCallback } from "react"
 
-import { Input } from "@/components/ui/input"
+const CodeMirror = dynamic(() => import("@uiw/react-codemirror"), { ssr: false })
 
 interface QueryEditorProps {
   value: string
@@ -9,27 +11,32 @@ interface QueryEditorProps {
   onRun: () => void
 }
 
-export function QueryEditor({ value, onChange }: QueryEditorProps) {
-  function onRun() {
-    throw new Error("Function not implemented.")
-  }
+export function QueryEditor({ value, onChange, onRun }: QueryEditorProps) {
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault()
+        onRun()
+      }
+    },
+    [onRun]
+  )
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 p-4">
-        <Input
-          type="text"
-          placeholder="Enter your SQL query"
-          className="w-full h-full"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && e.ctrlKey) {
-              onRun()
-            }
-          }}
-        />
-      </div>
+    <div className="flex flex-col h-full" onKeyDown={handleKeyDown}>
+      <CodeMirror
+        value={value}
+        onChange={onChange}
+        height="100%"
+        className="h-full overflow-auto text-sm"
+        basicSetup={{
+          lineNumbers: true,
+          foldGutter: true,
+          highlightActiveLine: true,
+          autocompletion: true,
+        }}
+        theme="light"
+      />
     </div>
   )
 }

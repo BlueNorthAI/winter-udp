@@ -278,7 +278,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
         collapsed ? "w-16" : "w-56"
       } border-r bg-gray-50 flex flex-col transition-all duration-300 md:flex h-full`}
     >
-      <div className="p-4">
+      {/* <div className="p-4">
         <div className="relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
@@ -289,9 +289,9 @@ export function Sidebar({ collapsed }: SidebarProps) {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-      </div>
+      </div> */}
 
-      <div className="flex-1 overflow-auto">
+      <div className="mt-14 flex-1 overflow-auto">
         <SidebarSection
           title=""
           items={routes.map((item) => ({
@@ -366,7 +366,7 @@ function SidebarSection({
 }: SidebarSectionProps) {
   return (
     <>
-      {!collapsed && (
+      {!collapsed && title && (
         <div className="px-4 py-2 text-sm font-medium text-gray-500">
           {title}
         </div>

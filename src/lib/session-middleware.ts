@@ -1,58 +1,69 @@
 import "server-only";
 
-import { 
-  Account,
-  Client,
-  Databases,
-  Models,
-  Storage,
-  type Account as AccountType,
-  type Databases as DatabasesType,
-  type Storage as StorageType,
-  type Users as UsersType,
-} from "node-appwrite";
-
 import { getCookie } from "hono/cookie";
 import { createMiddleware } from "hono/factory";
+import { Pool } from "pg";
+import { getPool } from "./db";
+import { runMigrations } from "./db-migrate";
 
 import { AUTH_COOKIE } from "@/features/auth/constants";
 
+export type AppUser = {
+  id: string;
+  name: string;
+  email: string;
+};
+
 type AdditionalContext = {
   Variables: {
-    account: AccountType;
-    databases: DatabasesType;
-    storage: StorageType;
-    users: UsersType;
-    user: Models.User<Models.Preferences>;
+    user: AppUser;
+    db: Pool;
   };
+};
+
+const DEFAULT_USER: AppUser = {
+  id: "default-user",
+  name: "User",
+  email: "user@localhost",
 };
 
 export const sessionMiddleware = createMiddleware<AdditionalContext>(
   async (c, next) => {
-    const client = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT!);
+    await runMigrations();
 
-    const session = getCookie(c, AUTH_COOKIE);
+    const pool = getPool();
+    c.set("db", pool);
 
-    if (!session) {
-      return c.json({ error: "Unauthorized" }, 401);
+    const token = getCookie(c, AUTH_COOKIE);
+
+    if (!token) {
+      c.set("user", DEFAULT_USER);
+      await next();
+      return;
     }
 
-    client.setSession(session);
+    // Validate session token against PostgreSQL
+    const result = await pool.query(
+      `SELECT s.user_id, u.id, u.name, u.email
+       FROM app.sessions s
+       JOIN app.users u ON s.user_id = u.id
+       WHERE s.token = $1 AND s.expires_at > NOW()`,
+      [token]
+    );
 
-    const account = new Account(client);
-    const databases = new Databases(client);
-    const storage = new Storage(client);
+    if (result.rows.length === 0) {
+      c.set("user", DEFAULT_USER);
+      await next();
+      return;
+    }
 
-    const user = await account.get();
-
-    c.set("account", account);
-    c.set("databases", databases);
-    c.set("storage", storage);
-    c.set("user", user);
+    const row = result.rows[0];
+    c.set("user", {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+    });
 
     await next();
   },
 );
-

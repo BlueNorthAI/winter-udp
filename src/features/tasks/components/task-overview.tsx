@@ -36,10 +36,10 @@ export const TaskOverview = ({
         <div className="flex flex-col gap-y-4">
           <OverviewProperty label="Assignee">
             <MemberAvatar
-              name={task.assignee.name}
+              name={task.assignee?.name || ""}
               className="size-6"
             />
-            <p className="text-sm font-medium">{task.assignee.name}</p>
+            <p className="text-sm font-medium">{task.assignee?.name || "Unassigned"}</p>
           </OverviewProperty>
           <OverviewProperty label="Due Date">
             <TaskDate value={task.dueDate} className="text-sm font-medium" />
