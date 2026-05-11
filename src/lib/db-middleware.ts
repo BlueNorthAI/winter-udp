@@ -2,7 +2,7 @@ import "server-only";
 
 import { createMiddleware } from "hono/factory";
 import { Pool } from "pg";
-import { getPool } from "./db";
+import { getDatalakePool } from "./db";
 
 type DbContext = {
   Variables: {
@@ -11,7 +11,7 @@ type DbContext = {
 };
 
 export const dbMiddleware = createMiddleware<DbContext>(async (c, next) => {
-  const pool = getPool();
+  const pool = getDatalakePool();
   c.set("db", pool);
   await next();
 });

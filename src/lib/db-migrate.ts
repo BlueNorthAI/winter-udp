@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getPool } from "./db";
+import { getPool, getDatalakePool } from "./db";
 
 const META_SCHEMA_SQL = `
 -- Meta schema for platform metadata
@@ -337,34 +337,62 @@ CREATE INDEX IF NOT EXISTS idx_pricing_store ON retail.pricing(store_id);
 CREATE INDEX IF NOT EXISTS idx_panel_category ON retail.panel_data(category);
 `;
 
-let migrated = false;
+let appMigrated = false;
+let datalakeMigrated = false;
 
 export async function runMigrations() {
-  if (migrated) return;
+  // Migrate app schema (users, sessions, workspaces, etc.) on login DB
+  if (!appMigrated) {
+    const appPool = getPool();
+    const appClient = await appPool.connect();
+    try {
+      await appClient.query("BEGIN");
+      await appClient.query(APP_SCHEMA_SQL);
+      await appClient.query(`
+        INSERT INTO app.users (id, name, email, password_hash)
+        SELECT '00000000-0000-0000-0000-000000000001', 'User', 'user@localhost',
+               '$2b$10$Je.nJZMUCWOhUBIcqwEwAeXIMGBWzyc/NkL6A.C.1h6IFGe91zzXy'
+        WHERE NOT EXISTS (
+          SELECT 1 FROM app.users
+          WHERE id = '00000000-0000-0000-0000-000000000001' OR email = 'user@localhost'
+        )
+      `);
+      await appClient.query("COMMIT");
+      appMigrated = true;
+      console.log("[DB] App schema migrated on login DB");
+    } catch (error) {
+      await appClient.query("ROLLBACK");
+      console.error("[DB] App migration failed:", error);
+      throw error;
+    } finally {
+      appClient.release();
+    }
+  }
 
-  const pool = getPool();
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-    await client.query(APP_SCHEMA_SQL);
-    await client.query(META_SCHEMA_SQL);
-    await client.query(RETAIL_SCHEMA_SQL);
-    await client.query("COMMIT");
-    migrated = true;
-    console.log("[DB] Meta and retail schemas migrated successfully");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error("[DB] Migration failed:", error);
-    throw error;
-  } finally {
-    client.release();
+  // Migrate meta + retail schemas on datalake DB
+  if (!datalakeMigrated) {
+    const dlPool = getDatalakePool();
+    const dlClient = await dlPool.connect();
+    try {
+      await dlClient.query("BEGIN");
+      await dlClient.query(META_SCHEMA_SQL);
+      await dlClient.query(RETAIL_SCHEMA_SQL);
+      await dlClient.query("COMMIT");
+      datalakeMigrated = true;
+      console.log("[DB] Meta and retail schemas migrated on datalake DB");
+    } catch (error) {
+      await dlClient.query("ROLLBACK");
+      console.error("[DB] Datalake migration failed:", error);
+      throw error;
+    } finally {
+      dlClient.release();
+    }
   }
 }
 
 export async function ensureWorkspaceSchemas(workspaceId: string) {
   const safeId = workspaceId.replace(/[^a-zA-Z0-9_]/g, "_");
-  const pool = getPool();
+  const pool = getDatalakePool();
   const client = await pool.connect();
 
   try {

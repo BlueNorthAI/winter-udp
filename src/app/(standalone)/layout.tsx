@@ -1,14 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { UserButton } from "@/features/auth/components/user-button";
-
 interface StandloneLayoutProps {
   children: React.ReactNode;
 };
 
 const StandloneLayout = ({ children }: StandloneLayoutProps) => {
-  return ( 
+  return (
     <main className="bg-neutral-100 min-h-screen">
       <div className="mx-auto max-w-screen-2xl p-4">
         <nav className="flex justify-between items-center h-[73px]">
@@ -16,7 +14,6 @@ const StandloneLayout = ({ children }: StandloneLayoutProps) => {
           <Image src="/assets/logo.png" alt="logo" width={40} height={40} />
           <Image src="/assets/Bluenorthai.png" alt="logo" width={180} height={180} />
           </Link>
-          <UserButton />
         </nav>
         <div className="flex flex-col items-center justify-center py-4">
           {children}

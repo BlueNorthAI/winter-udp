@@ -1,6 +1,6 @@
 import "server-only";
 
-import ss from "simple-statistics";
+import * as ss from "simple-statistics";
 
 export interface DescriptiveStats {
   count: number;

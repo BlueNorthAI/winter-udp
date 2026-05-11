@@ -1,7 +1,6 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { UserButton } from "@/features/auth/components/user-button";
 import { Menu } from "lucide-react"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { WorkspaceSwitcherHeader } from "@/components/workspace-switcherHeader";
@@ -57,7 +56,6 @@ export function TopNavBar({ toggleSidebar }: TopNavBarProps) {
         <WorkspaceSwitcherHeader />
       </Suspense>}
        
-        <UserButton />
       </div>
     </header>
   )
