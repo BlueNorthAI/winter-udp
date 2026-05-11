@@ -7,7 +7,11 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const workspaces = await getWorkspaces();
   if (!workspaces.documents[0]) {
-    redirect("/workspaces/create");
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-muted-foreground">Connecting to database...</p>
+      </div>
+    );
   }
   redirect(`/workspaces/${workspaces.documents[0].$id}/workspacedata`);
 };
