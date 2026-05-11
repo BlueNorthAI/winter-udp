@@ -9,7 +9,7 @@ import { MemberRole } from "@/features/members/types";
 import { getMember } from "@/features/members/utils";
 import { generateInviteCode } from "@/lib/utils";
 import { sessionMiddleware } from "@/lib/session-middleware";
-import { ensureWorkspaceSchemas, sanitizeWorkspaceId } from "@/lib/db-migrate";
+import { ensureWorkspaceSchemas, sanitizeWorkspaceId, runMigrations } from "@/lib/db-migrate";
 
 import { createWorkspaceSchema, updateWorkspaceSchema } from "../schemas";
 
@@ -18,15 +18,31 @@ const app = new Hono()
     const user = c.get("user");
     const db = c.get("db") as Pool;
 
+    await runMigrations();
+
     const result = await db.query(
       `SELECT w.id as "$id", w.name, w.image_url as "imageUrl", w.invite_code as "inviteCode",
               w.user_id as "userId", w.created_at as "$createdAt"
        FROM app.workspaces w
-       JOIN app.members m ON w.id = m.workspace_id
-       WHERE m.user_id = $1
-       ORDER BY w.created_at DESC`,
-      [user.id]
+       ORDER BY w.created_at DESC`
     );
+
+    if (result.rows.length === 0) {
+      const inviteCode = generateInviteCode(6);
+      const wsResult = await db.query(
+        `INSERT INTO app.workspaces (name, image_url, invite_code, user_id)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id as "$id", name, image_url as "imageUrl", invite_code as "inviteCode", user_id as "userId", created_at as "$createdAt"`,
+        ["Default Workspace", "", inviteCode, user.id]
+      );
+      const workspace = wsResult.rows[0];
+      await db.query(
+        "INSERT INTO app.members (workspace_id, user_id, role) VALUES ($1, $2, $3)",
+        [workspace.$id, user.id, MemberRole.ADMIN]
+      );
+      await ensureWorkspaceSchemas(sanitizeWorkspaceId(workspace.$id));
+      return c.json({ data: { documents: [workspace], total: 1 } });
+    }
 
     return c.json({ data: { documents: result.rows, total: result.rows.length } });
   })

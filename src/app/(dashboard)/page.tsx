@@ -2,11 +2,12 @@ import { redirect } from "next/navigation";
 
 import { getWorkspaces } from "@/features/workspaces/queries";
 
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   const workspaces = await getWorkspaces();
-  if (workspaces.total === 0) {
+  if (!workspaces.documents[0]) {
     redirect("/workspaces/create");
-  } else {
-    redirect(`/workspaces/${workspaces.documents[0].$id}/workspacedata`);
   }
+  redirect(`/workspaces/${workspaces.documents[0].$id}/workspacedata`);
 };

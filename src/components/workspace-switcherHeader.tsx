@@ -6,7 +6,6 @@ import { ChevronDown, Plus, Database, Building2 } from "lucide-react";
 import { useWorkspaceId } from "@/features/workspaces/hooks/use-workspace-id";
 import { useGetWorkspaces } from "@/features/workspaces/api/use-get-workspaces";
 import { WorkspaceAvatar } from "@/features/workspaces/components/workspace-avatar";
-import { useCreateWorkspaceModal } from "@/features/workspaces/hooks/use-create-workspace-modal";
 
 import {
   DropdownMenu,
@@ -22,7 +21,6 @@ export function WorkspaceSwitcherHeader() {
   const workspaceId = useWorkspaceId();
   const router = useRouter();
   const { data: workspaces } = useGetWorkspaces();
-  const { open } = useCreateWorkspaceModal();
 
   const currentWorkspace = workspaces?.documents.find(
     (ws) => ws.$id === workspaceId
@@ -101,13 +99,6 @@ export function WorkspaceSwitcherHeader() {
         >
           <Plus className="h-4 w-4" />
           <span className="text-sm">Add Data Source</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={open}
-          className="flex items-center gap-2 cursor-pointer"
-        >
-          <Plus className="h-4 w-4" />
-          <span className="text-sm">Create Workspace</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
